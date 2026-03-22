@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import datetime
 from email.message import EmailMessage
 from functools import wraps
+import logging
 import os
 import smtplib
 import sys
@@ -9,6 +10,7 @@ from uuid import uuid4
 
 import numpy as np
 from flask import Flask, flash, redirect, render_template, request, send_file, send_from_directory, session, url_for
+from werkzeug.exceptions import HTTPException
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
@@ -40,6 +42,7 @@ app = Flask(
 )
 app.secret_key = os.getenv("FRACTUREAI_SECRET_KEY", "fractureai-secret-key")
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
+app.logger.setLevel(logging.INFO)
 
 for directory in (DATA_DIR, UPLOAD_DIR, GRADCAM_DIR, PDF_DIR):
     directory.mkdir(parents=True, exist_ok=True)
@@ -380,6 +383,36 @@ def dataset_stats():
     }
 
 
+def safe_dashboard_stats():
+    try:
+        return dashboard_stats()
+    except Exception as exc:
+        app.logger.exception("Failed to load dashboard stats: %s", exc)
+        return {
+            "total_cases": 0,
+            "fracture_cases": 0,
+            "normal_cases": 0,
+            "fracture_rate": 0,
+            "average_confidence": 0,
+        }
+
+
+def safe_list_cases(search_query=""):
+    try:
+        return list_cases(search_query)
+    except Exception as exc:
+        app.logger.exception("Failed to list cases: %s", exc)
+        return []
+
+
+def safe_recent_cases(limit=5):
+    try:
+        return recent_cases(limit)
+    except Exception as exc:
+        app.logger.exception("Failed to load recent cases: %s", exc)
+        return []
+
+
 def compute_performance_metrics():
     if not MODEL_PATH.exists():
         return None
@@ -410,14 +443,14 @@ def compute_performance_metrics():
 
 def base_context():
     search_query = request.args.get("q", "").strip()
-    stats = dashboard_stats()
-    history = list_cases(search_query)
+    stats = safe_dashboard_stats()
+    history = safe_list_cases(search_query)
     return {
         "dataset_ready": dataset_is_ready(),
         "model_ready": MODEL_PATH.exists(),
         "stats": stats,
         "history_cases": history,
-        "recent_cases": recent_cases(),
+        "recent_cases": safe_recent_cases(),
         "search_query": search_query,
         "patient_details": patient_details_defaults(),
         "health_flags": [],
@@ -535,13 +568,14 @@ def index():
                     "gradcam_error": gradcam_error,
                     "report_file": report_name,
                     "case_id": case_id,
-                    "stats": dashboard_stats(),
-                    "history_cases": list_cases(request.args.get("q", "").strip()),
-                    "recent_cases": recent_cases(),
+                    "stats": safe_dashboard_stats(),
+                    "history_cases": safe_list_cases(request.args.get("q", "").strip()),
+                    "recent_cases": safe_recent_cases(),
                 }
             )
             return render_template("index.html", **context)
         except Exception as exc:
+            app.logger.exception("Prediction workflow failed: %s", exc)
             context["error"] = f"Prediction failed: {exc}"
             return render_template("index.html", **context)
 
@@ -646,6 +680,24 @@ def report_file(filename):
 @login_required
 def model_assets(filename):
     return send_from_directory(str(MODEL_DIR), filename)
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    if isinstance(error, HTTPException):
+        return error
+
+    app.logger.exception("Unhandled application error: %s", error)
+
+    if session.get("user_id"):
+        context = base_context()
+        context["error"] = "Something went wrong on the server. Please try again."
+        return render_template("index.html", **context), 200
+
+    return render_template(
+        "login.html",
+        error="Something went wrong on the server. Please try again.",
+    ), 200
 
 
 if __name__ == "__main__":
