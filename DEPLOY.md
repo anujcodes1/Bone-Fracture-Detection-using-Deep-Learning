@@ -30,6 +30,7 @@ Render with Docker is the safest option for this project because it uses:
 - SQLite, uploaded files, reports, and saved history need persistent storage.
 - This project uses a Render disk mounted at `/data`.
 - Runtime files are stored through `FRACTUREAI_DATA_DIR=/data`.
+- Because the app uses a persistent disk, the Render web service should use a paid instance such as `starter` instead of `free`.
 - If you want email sending in production, set these environment variables in Render:
   - `FRACTUREAI_SMTP_SERVER`
   - `FRACTUREAI_SMTP_PORT`

@@ -2,7 +2,7 @@ services:
   - type: web
     name: fractureai
     runtime: docker
-    plan: free
+    plan: starter
     autoDeploy: true
     disk:
       name: fractureai-data
