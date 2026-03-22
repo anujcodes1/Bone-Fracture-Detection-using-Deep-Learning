@@ -1,0 +1,9 @@
+flask
+tensorflow
+opencv-python
+matplotlib
+numpy
+scipy
+werkzeug
+reportlab
+gunicorn

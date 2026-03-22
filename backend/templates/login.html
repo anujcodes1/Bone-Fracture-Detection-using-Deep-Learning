@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FractureAI | Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="page-shell login-shell">
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+    <div class="grid-overlay"></div>
+
+    <main class="login-wrapper">
+      <section class="glass-card login-card">
+        <div class="eyebrow">Secure Access</div>
+        <h1>FractureAI Login</h1>
+        <p class="hero-text">Sign in as admin or doctor to access the clinical AI dashboard.</p>
+
+        <form method="post" class="upload-form">
+          <label class="field">
+            <span>Username</span>
+            <input type="text" name="username" placeholder="admin or doctor" required>
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input type="password" name="password" placeholder="Enter password" required>
+          </label>
+          <button type="submit" class="primary-btn">Sign In</button>
+        </form>
+
+        {% if error %}
+        <p class="message error">{{ error }}</p>
+        {% endif %}
+
+        <div class="login-hint">
+          <p><strong>Demo Admin:</strong> `admin / admin123`</p>
+          <p><strong>Demo Doctor:</strong> `doctor / doctor123`</p>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

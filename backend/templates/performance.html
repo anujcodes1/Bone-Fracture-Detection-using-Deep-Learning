@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FractureAI | Model Performance</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+    <div class="grid-overlay"></div>
+
+    <main class="container">
+      <header class="topbar topbar-app">
+        <div class="brand-mark">
+          <span class="brand-icon"></span>
+          <div>
+            <strong>FractureAI</strong>
+            <p>Model Performance Console</p>
+          </div>
+        </div>
+
+        <nav class="top-actions">
+          <a class="nav-chip" href="{{ url_for('index') }}">Back to Dashboard</a>
+          <div class="user-chip">{{ current_user.username }} / {{ current_user.role }}</div>
+        </nav>
+      </header>
+
+      <section class="glass-card">
+        <div class="section-head">
+          <p class="section-kicker">Performance Overview</p>
+          <h2>Model Metrics and Dataset Statistics</h2>
+        </div>
+
+        {% if metrics %}
+        <div class="summary-grid">
+          <div class="summary-tile confidence-tile">
+            <span class="tile-label">Test Accuracy</span>
+            <strong>{{ metrics.accuracy }}%</strong>
+          </div>
+          <div class="summary-tile neutral-tile">
+            <span class="tile-label">True Positives</span>
+            <strong>{{ metrics.tp }}</strong>
+          </div>
+          <div class="summary-tile neutral-tile">
+            <span class="tile-label">True Negatives</span>
+            <strong>{{ metrics.tn }}</strong>
+          </div>
+          <div class="summary-tile neutral-tile">
+            <span class="tile-label">False Positives / False Negatives</span>
+            <strong>{{ metrics.fp }} / {{ metrics.fn }}</strong>
+          </div>
+        </div>
+        {% else %}
+        <p class="message error">Model metrics are unavailable until the trained model exists.</p>
+        {% endif %}
+
+        <div class="performance-grid">
+          <div class="glass-subcard">
+            <h3>Confusion Matrix</h3>
+            {% if metrics %}
+            <div class="matrix-grid">
+              <div class="matrix-cell matrix-head">Predicted Fracture</div>
+              <div class="matrix-cell matrix-head">Predicted Normal</div>
+              <div class="matrix-cell matrix-value">{{ metrics.tp }}</div>
+              <div class="matrix-cell matrix-value">{{ metrics.fn }}</div>
+              <div class="matrix-cell matrix-value">{{ metrics.fp }}</div>
+              <div class="matrix-cell matrix-value">{{ metrics.tn }}</div>
+            </div>
+            <p class="matrix-caption">Rows correspond to actual fracture and actual normal samples.</p>
+            {% endif %}
+          </div>
+
+          <div class="glass-subcard">
+            <h3>Dataset Statistics</h3>
+            <ul class="performance-list">
+              <li>Train Fractured: {{ dataset_counts.train_fractured }}</li>
+              <li>Train Normal: {{ dataset_counts.train_normal }}</li>
+              <li>Validation Fractured: {{ dataset_counts.val_fractured }}</li>
+              <li>Validation Normal: {{ dataset_counts.val_normal }}</li>
+              <li>Test Fractured: {{ dataset_counts.test_fractured }}</li>
+              <li>Test Normal: {{ dataset_counts.test_normal }}</li>
+            </ul>
+          </div>
+        </div>
+
+        {% if training_graph_exists %}
+        <div class="glass-subcard">
+          <h3>Training Accuracy and Loss Graph</h3>
+          <img class="training-graph" src="{{ url_for('model_assets', filename='training_history.png') }}" alt="Training graph">
+        </div>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+</body>
+</html>

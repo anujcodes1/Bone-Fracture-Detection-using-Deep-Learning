@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FractureAI | Clinical Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="loading-overlay" id="loading-overlay" aria-hidden="true">
+    <div class="loader-card">
+      <div class="loader-ring"></div>
+      <h2>Analyzing X-ray with FractureAI</h2>
+      <p>Running AI screening, generating Grad-CAM, updating case history, and preparing the final report.</p>
+    </div>
+  </div>
+
+  <div class="page-shell">
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+    <div class="grid-overlay"></div>
+
+    <main class="container">
+      <header class="topbar topbar-app">
+        <div class="brand-mark">
+          <span class="brand-icon"></span>
+          <div>
+            <strong>FractureAI</strong>
+            <p>Medical Intelligence Interface</p>
+          </div>
+        </div>
+
+        <nav class="top-actions">
+          <a class="nav-chip" href="{{ url_for('performance') }}">Model Performance</a>
+          <button class="nav-chip" type="button" id="theme-toggle">Toggle Theme</button>
+          <div class="user-chip">{{ current_user.username }} / {{ current_user.role }}</div>
+          <a class="nav-chip nav-chip-danger" href="{{ url_for('logout') }}">Logout</a>
+        </nav>
+      </header>
+
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <div class="eyebrow">AI-Powered Radiology Assistant</div>
+          <h1>FractureAI</h1>
+          <p class="hero-text">
+            A next-generation medical AI workspace for fracture detection, explainable imaging, patient record management,
+            and clinical-ready reporting in one intelligent dashboard.
+          </p>
+
+          <div class="hero-pills">
+            <span>Secure Doctor Login</span>
+            <span>Fracture + Confidence</span>
+            <span>Grad-CAM Comparison</span>
+            <span>Case History + Feedback</span>
+          </div>
+
+          <div class="quote-card">
+            <p class="quote-line">"Where medical imaging meets the intelligence of tomorrow."</p>
+            <p class="quote-credit">FractureAI by Anuj</p>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="scan-card">
+            <div class="scan-topbar">
+              <span class="dot cyan"></span>
+              <span class="dot teal"></span>
+              <span class="dot amber"></span>
+            </div>
+            <div class="scan-screen">
+              <div class="scan-ring"></div>
+              <div class="scan-line"></div>
+              <div class="scan-cross cross-a"></div>
+              <div class="scan-cross cross-b"></div>
+              <div class="scan-label">BONE ANALYSIS</div>
+            </div>
+          </div>
+
+          <div class="metric-stack">
+            <div class="metric-chip">
+              <span>Total Cases</span>
+              <strong>{{ stats.total_cases }}</strong>
+            </div>
+            <div class="metric-chip">
+              <span>Fracture Rate</span>
+              <strong>{{ stats.fracture_rate }}%</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats-strip">
+        <div class="quick-stat glass-card">
+          <span class="stat-label">Cases Saved</span>
+          <strong>{{ stats.total_cases }}</strong>
+        </div>
+        <div class="quick-stat glass-card">
+          <span class="stat-label">Fracture Cases</span>
+          <strong>{{ stats.fracture_cases }}</strong>
+        </div>
+        <div class="quick-stat glass-card">
+          <span class="stat-label">Normal Cases</span>
+          <strong>{{ stats.normal_cases }}</strong>
+        </div>
+        <div class="quick-stat glass-card">
+          <span class="stat-label">Avg Confidence</span>
+          <strong>{{ stats.average_confidence }}%</strong>
+        </div>
+      </section>
+
+      {% if error %}
+      <p class="message error">{{ error }}</p>
+      {% endif %}
+      {% if message %}
+      <p class="message success">{{ message }}</p>
+      {% endif %}
+
+      <section class="glass-card setup-card">
+        <div class="section-head">
+          <p class="section-kicker">Email Delivery</p>
+          <h2>Report Email Configuration</h2>
+        </div>
+
+        {% if email_status.configured %}
+        <p class="message success">Email delivery is configured. You can send PDF case reports directly from the dashboard.</p>
+        {% else %}
+        <p class="message error">Email is not configured yet. Missing variables: {{ email_status.missing|join(', ') }}</p>
+        <div class="code-block">
+          <pre><code>$env:FRACTUREAI_SMTP_SERVER="smtp.gmail.com"
+$env:FRACTUREAI_SMTP_PORT="587"
+$env:FRACTUREAI_SMTP_USERNAME="your_email@gmail.com"
+$env:FRACTUREAI_SMTP_PASSWORD="your_app_password"
+$env:FRACTUREAI_SENDER_EMAIL="your_email@gmail.com"</code></pre>
+        </div>
+        <p class="helper-text">For Gmail, use an App Password instead of your normal Gmail password.</p>
+        {% endif %}
+      </section>
+
+      <section class="dashboard-grid dashboard-grid-wide">
+        <div class="glass-card upload-card">
+          <div class="section-head">
+            <p class="section-kicker">Clinical Submission</p>
+            <h2>Patient Intake and X-ray Upload</h2>
+          </div>
+
+          <form method="post" enctype="multipart/form-data" class="upload-form" id="analysis-form">
+            <div class="patient-grid">
+              <label class="field">
+                <span>Patient Name</span>
+                <div class="voice-field">
+                  <input type="text" id="patient_name" name="patient_name" value="{{ patient_details.patient_name }}" placeholder="Enter patient name">
+                  <button type="button" class="mic-btn" data-target="patient_name">Mic</button>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Patient ID</span>
+                <div class="voice-field">
+                  <input type="text" id="patient_id" name="patient_id" value="{{ patient_details.patient_id }}" placeholder="Enter patient ID">
+                  <button type="button" class="mic-btn" data-target="patient_id">Mic</button>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Age</span>
+                <input type="text" name="patient_age" value="{{ patient_details.patient_age }}" placeholder="Enter age">
+              </label>
+
+              <label class="field">
+                <span>Gender</span>
+                <select name="patient_gender">
+                  <option value="">Select gender</option>
+                  <option value="Male" {{ 'selected' if patient_details.patient_gender == 'Male' else '' }}>Male</option>
+                  <option value="Female" {{ 'selected' if patient_details.patient_gender == 'Female' else '' }}>Female</option>
+                  <option value="Other" {{ 'selected' if patient_details.patient_gender == 'Other' else '' }}>Other</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Referring Doctor</span>
+                <div class="voice-field">
+                  <input type="text" id="doctor_name" name="doctor_name" value="{{ patient_details.doctor_name }}" placeholder="Enter doctor name">
+                  <button type="button" class="mic-btn" data-target="doctor_name">Mic</button>
+                </div>
+              </label>
+
+              <label class="field">
+                <span>Patient Email</span>
+                <input type="email" name="patient_email" value="{{ patient_details.patient_email }}" placeholder="Enter patient email">
+              </label>
+
+              <label class="field">
+                <span>Temperature (C)</span>
+                <input type="text" name="temperature" value="{{ patient_details.temperature }}" placeholder="Example: 36.8">
+              </label>
+
+              <label class="field">
+                <span>Pulse Rate (bpm)</span>
+                <input type="text" name="pulse_rate" value="{{ patient_details.pulse_rate }}" placeholder="Example: 78">
+              </label>
+
+              <label class="field">
+                <span>SpO2 (%)</span>
+                <input type="text" name="spo2" value="{{ patient_details.spo2 }}" placeholder="Example: 98">
+              </label>
+
+              <label class="field">
+                <span>Systolic BP</span>
+                <input type="text" name="systolic_bp" value="{{ patient_details.systolic_bp }}" placeholder="Example: 120">
+              </label>
+
+              <label class="field">
+                <span>Diastolic BP</span>
+                <input type="text" name="diastolic_bp" value="{{ patient_details.diastolic_bp }}" placeholder="Example: 80">
+              </label>
+
+              <label class="field">
+                <span>Pain Level (0-10)</span>
+                <input type="text" name="pain_level" value="{{ patient_details.pain_level }}" placeholder="Example: 4">
+              </label>
+
+              <label class="field field-wide">
+                <span>Symptoms</span>
+                <textarea name="symptoms" rows="3" placeholder="Describe symptoms like swelling, fever, dizziness, or pain area">{{ patient_details.symptoms }}</textarea>
+              </label>
+
+              <label class="field field-wide">
+                <span>Doctor Notes</span>
+                <textarea id="doctor_notes" name="doctor_notes" rows="4" placeholder="Add doctor notes for the case and PDF report">{{ patient_details.doctor_notes }}</textarea>
+              </label>
+            </div>
+
+            <div class="input-tools">
+              <button type="button" class="secondary-btn" id="start-camera-btn">Open Camera</button>
+              <button type="button" class="secondary-btn" id="capture-photo-btn">Capture Photo</button>
+            </div>
+
+            <div class="camera-panel" id="camera-panel">
+              <video id="camera-stream" autoplay playsinline></video>
+              <canvas id="camera-canvas" hidden></canvas>
+            </div>
+
+            <input id="xray_image" class="hidden-input" type="file" name="xray_image" accept=".png,.jpg,.jpeg" required>
+
+            <label for="xray_image" class="upload-dropzone" id="upload-dropzone">
+              <span class="upload-icon">+</span>
+              <span class="upload-title">Drop an X-ray here or click to browse</span>
+              <span id="file-name" class="upload-subtitle">Accepted formats: PNG, JPG, JPEG</span>
+            </label>
+
+            <div class="preview-panel" id="preview-panel">
+              <div class="preview-card">
+                <h3>Preview Before Analysis</h3>
+                <img id="image-preview" alt="Image preview">
+              </div>
+            </div>
+
+            <button type="submit" class="primary-btn">Run Fracture Analysis</button>
+          </form>
+        </div>
+
+        <div class="glass-card info-card">
+          <div class="section-head">
+            <p class="section-kicker">Dashboard Insights</p>
+            <h2>History and Search</h2>
+          </div>
+
+          <form method="get" class="history-search">
+            <input type="text" name="q" value="{{ search_query }}" placeholder="Search by patient name or patient ID">
+            <button type="submit" class="secondary-btn">Search History</button>
+          </form>
+
+          <div class="chart-stack">
+            <div class="mini-chart-card">
+              <span class="stat-label">Fracture Ratio</span>
+              <div class="bar-chart">
+                <div class="bar fracture-bar" style="height: {{ stats.fracture_rate if stats.fracture_rate > 8 else 8 }}%;"></div>
+                <div class="bar normal-bar" style="height: {{ 100 - stats.fracture_rate if stats.total_cases else 40 }}%;"></div>
+              </div>
+            </div>
+
+            <div class="mini-chart-card">
+              <span class="stat-label">Recent Cases</span>
+              <ul class="recent-case-list">
+                {% for item in recent_cases %}
+                <li>
+                  <strong>{{ item.patient_name or 'Unknown Patient' }}</strong>
+                  <span>{{ item.result }} / {{ item.confidence|round(2) }}%</span>
+                </li>
+                {% else %}
+                <li><span>No saved cases yet.</span></li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {% if result %}
+      <section class="results-board">
+        <div class="glass-card result-summary">
+          <div class="section-head">
+            <p class="section-kicker">Analysis Output</p>
+            <h2>Prediction Summary and Smart Actions</h2>
+          </div>
+
+          <div class="summary-grid">
+            <div class="summary-tile {{ 'alert-tile' if result == 'Fracture' else 'safe-tile' }}">
+              <span class="tile-label">Result</span>
+              <strong class="result-badge {{ 'result-badge-alert' if result == 'Fracture' else 'result-badge-safe' }}">{{ result }}</strong>
+            </div>
+
+            <div class="summary-tile confidence-tile">
+              <span class="tile-label">Confidence</span>
+              <strong id="confidence-value" data-confidence="{{ confidence }}">0.00%</strong>
+              <div class="confidence-meter">
+                <div class="confidence-fill" style="width: {{ confidence }}%;"></div>
+              </div>
+            </div>
+
+            <div class="summary-tile neutral-tile">
+              <span class="tile-label">Severity</span>
+              <strong>{{ severity }}</strong>
+            </div>
+
+            <div class="summary-tile neutral-tile">
+              <span class="tile-label">Region Label</span>
+              <strong>{{ region_label }}</strong>
+            </div>
+
+            <div class="summary-tile confidence-tile">
+              <span class="tile-label">Health Score</span>
+              <strong>{{ health_score }} / 100</strong>
+              <div class="confidence-meter">
+                <div class="confidence-fill" style="width: {{ health_score }}%;"></div>
+              </div>
+            </div>
+
+            <div class="summary-tile neutral-tile">
+              <span class="tile-label">Overall Health</span>
+              <strong>{{ overall_health }}</strong>
+            </div>
+          </div>
+
+          <div class="gauge-row">
+            <div class="gauge-card">
+              <div class="gauge-circle" style="--gauge-value: {{ confidence }};">
+                <div class="gauge-inner">
+                  <span>AI Score</span>
+                  <strong>{{ confidence }}%</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="patient-summary-grid">
+              <div class="patient-card">
+                <span class="tile-label">Patient Name</span>
+                <strong>{{ patient_details.patient_name or 'Not Provided' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Patient ID</span>
+                <strong>{{ patient_details.patient_id or 'Not Provided' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Age / Gender</span>
+                <strong>{{ patient_details.patient_age or 'NA' }} / {{ patient_details.patient_gender or 'NA' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Doctor</span>
+                <strong>{{ patient_details.doctor_name or 'Not Provided' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Vitals</span>
+                <strong>T {{ patient_details.temperature or 'NA' }} / P {{ patient_details.pulse_rate or 'NA' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Oxygen / BP</span>
+                <strong>{{ patient_details.spo2 or 'NA' }}% / {{ patient_details.systolic_bp or 'NA' }}-{{ patient_details.diastolic_bp or 'NA' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Pain Level</span>
+                <strong>{{ patient_details.pain_level or 'NA' }}</strong>
+              </div>
+              <div class="patient-card">
+                <span class="tile-label">Symptoms</span>
+                <strong>{{ patient_details.symptoms or 'Not Provided' }}</strong>
+              </div>
+            </div>
+          </div>
+
+          {% if health_flags %}
+          <div class="glass-subcard">
+            <h3>Health Flags for Overall Report</h3>
+            <ul class="performance-list">
+              {% for item in health_flags %}
+              <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          <div class="action-row">
+            <button type="button" class="secondary-btn" id="speak-result-btn" data-speech="Patient {{ patient_details.patient_name or 'Unknown patient' }}, result: {{ result }}. Confidence: {{ confidence }} percent. Severity: {{ severity }}. Region label: {{ region_label }}.">
+              Speak Result
+            </button>
+            {% if report_file %}
+            <a class="secondary-btn pdf-btn" href="{{ url_for('report_file', filename=report_file) }}">Download Full PDF</a>
+            {% endif %}
+            {% if case_id %}
+            <form method="post" action="{{ url_for('send_email', case_id=case_id) }}">
+              <input type="email" name="recipient_email" placeholder="Send report to any email" value="{{ recipient_email if recipient_email is defined else patient_details.patient_email }}">
+              <button type="submit" class="secondary-btn">Email Report</button>
+            </form>
+            <form method="post" action="{{ url_for('feedback', case_id=case_id) }}">
+              <input type="hidden" name="feedback" value="correct">
+              <button type="submit" class="secondary-btn">Mark Correct</button>
+            </form>
+            <form method="post" action="{{ url_for('feedback', case_id=case_id) }}">
+              <input type="hidden" name="feedback" value="incorrect">
+              <button type="submit" class="secondary-btn">Mark Incorrect</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="comparison-grid">
+          <article class="glass-card image-card">
+            <div class="section-head">
+              <p class="section-kicker">Source Scan</p>
+              <h2>Original X-ray</h2>
+            </div>
+            <img src="{{ url_for('uploaded_file', filename=uploaded_image) }}" alt="Uploaded X-ray">
+          </article>
+
+          <article class="glass-card image-card">
+            <div class="section-head">
+              <p class="section-kicker">AI Explanation</p>
+              <h2>Grad-CAM Heatmap</h2>
+            </div>
+            {% if gradcam_error %}
+            <p class="message error">{{ gradcam_error }}</p>
+            {% endif %}
+            {% if gradcam_image %}
+            <img src="{{ url_for('gradcam_file', filename=gradcam_image) }}" alt="Grad-CAM output">
+            {% else %}
+            <div class="placeholder-panel">Grad-CAM image not available for this upload.</div>
+            {% endif %}
+          </article>
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="glass-card history-board">
+        <div class="section-head">
+          <p class="section-kicker">Prediction History</p>
+          <h2>Saved Cases Dashboard</h2>
+        </div>
+
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Patient</th>
+                <th>ID</th>
+                <th>Result</th>
+                <th>Confidence</th>
+                <th>Severity</th>
+                <th>Health Score</th>
+                <th>Feedback</th>
+                <th>Health Report</th>
+                <th>Report</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in history_cases %}
+              <tr>
+                <td>{{ item.created_at }}</td>
+                <td>{{ item.patient_name or 'Not Provided' }}</td>
+                <td>{{ item.patient_id or 'Not Provided' }}</td>
+                <td>{{ item.result }}</td>
+                <td>{{ item.confidence|round(2) }}%</td>
+                <td>{{ item.severity or 'N/A' }}</td>
+                <td>{{ item.health_score|round(2) if item.health_score is not none else 'N/A' }}</td>
+                <td>{{ item.feedback or 'Pending' }}</td>
+                <td><a href="{{ url_for('health_report', case_id=item.id) }}">Open</a></td>
+                <td>
+                  {% if item.report_file %}
+                  <a href="{{ url_for('report_file', filename=item.report_file) }}">PDF</a>
+                  {% else %}
+                  -
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="10">No cases found yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const htmlRoot = document.documentElement;
+    const savedTheme = localStorage.getItem("fractureai-theme");
+    if (savedTheme) {
+      htmlRoot.dataset.theme = savedTheme;
+    }
+
+    const themeToggle = document.getElementById("theme-toggle");
+    if (themeToggle) {
+      themeToggle.addEventListener("click", function () {
+        const nextTheme = htmlRoot.dataset.theme === "light" ? "dark" : "light";
+        htmlRoot.dataset.theme = nextTheme;
+        localStorage.setItem("fractureai-theme", nextTheme);
+      });
+    }
+
+    const analysisForm = document.getElementById("analysis-form");
+    const loadingOverlay = document.getElementById("loading-overlay");
+    if (analysisForm && loadingOverlay) {
+      analysisForm.addEventListener("submit", function () {
+        loadingOverlay.classList.add("active");
+      });
+    }
+
+    const fileInput = document.getElementById("xray_image");
+    const fileName = document.getElementById("file-name");
+    const previewPanel = document.getElementById("preview-panel");
+    const imagePreview = document.getElementById("image-preview");
+    const dropzone = document.getElementById("upload-dropzone");
+
+    function showPreview(file) {
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        imagePreview.src = event.target.result;
+        previewPanel.classList.add("active");
+      };
+      reader.readAsDataURL(file);
+      fileName.textContent = file.name;
+    }
+
+    if (fileInput) {
+      fileInput.addEventListener("change", function () {
+        if (this.files && this.files[0]) {
+          showPreview(this.files[0]);
+        }
+      });
+    }
+
+    if (dropzone && fileInput) {
+      ["dragenter", "dragover"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropzone.classList.add("dragging");
+        });
+      });
+
+      ["dragleave", "drop"].forEach((eventName) => {
+        dropzone.addEventListener(eventName, function (event) {
+          event.preventDefault();
+          dropzone.classList.remove("dragging");
+        });
+      });
+
+      dropzone.addEventListener("drop", function (event) {
+        const file = event.dataTransfer.files[0];
+        if (!file) {
+          return;
+        }
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        showPreview(file);
+      });
+    }
+
+    const confidenceValue = document.getElementById("confidence-value");
+    if (confidenceValue) {
+      const target = Number(confidenceValue.dataset.confidence || "0");
+      const duration = 1200;
+      const startTime = performance.now();
+
+      function animateConfidence(now) {
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        confidenceValue.textContent = `${(target * eased).toFixed(2)}%`;
+        if (progress < 1) {
+          requestAnimationFrame(animateConfidence);
+        }
+      }
+
+      requestAnimationFrame(animateConfidence);
+    }
+
+    const speakButton = document.getElementById("speak-result-btn");
+    if (speakButton) {
+      speakButton.addEventListener("click", function () {
+        if (!("speechSynthesis" in window)) {
+          alert("Voice feature is not supported in this browser.");
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(this.dataset.speech);
+        utterance.rate = 0.95;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      });
+    }
+
+    const recognitionFactory = window.SpeechRecognition || window.webkitSpeechRecognition;
+    document.querySelectorAll(".mic-btn").forEach((button) => {
+      button.addEventListener("click", function () {
+        if (!recognitionFactory) {
+          alert("Voice input is not supported in this browser.");
+          return;
+        }
+
+        const recognition = new recognitionFactory();
+        recognition.lang = "en-US";
+        recognition.onresult = (event) => {
+          const targetInput = document.getElementById(this.dataset.target);
+          if (targetInput) {
+            targetInput.value = event.results[0][0].transcript;
+          }
+        };
+        recognition.start();
+      });
+    });
+
+    const cameraPanel = document.getElementById("camera-panel");
+    const cameraStream = document.getElementById("camera-stream");
+    const cameraCanvas = document.getElementById("camera-canvas");
+    const startCameraBtn = document.getElementById("start-camera-btn");
+    const capturePhotoBtn = document.getElementById("capture-photo-btn");
+    let liveStream = null;
+
+    if (startCameraBtn) {
+      startCameraBtn.addEventListener("click", async function () {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert("Camera access is not supported in this browser.");
+          return;
+        }
+
+        try {
+          liveStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          cameraStream.srcObject = liveStream;
+          cameraPanel.classList.add("active");
+        } catch (error) {
+          alert("Unable to access camera.");
+        }
+      });
+    }
+
+    if (capturePhotoBtn) {
+      capturePhotoBtn.addEventListener("click", function () {
+        if (!liveStream) {
+          alert("Open the camera first.");
+          return;
+        }
+
+        cameraCanvas.width = cameraStream.videoWidth;
+        cameraCanvas.height = cameraStream.videoHeight;
+        cameraCanvas.getContext("2d").drawImage(cameraStream, 0, 0);
+        cameraCanvas.toBlob(function (blob) {
+          const file = new File([blob], "camera_xray_capture.png", { type: "image/png" });
+          const transfer = new DataTransfer();
+          transfer.items.add(file);
+          fileInput.files = transfer.files;
+          showPreview(file);
+        }, "image/png");
+      });
+    }
+  </script>
+</body>
+</html>

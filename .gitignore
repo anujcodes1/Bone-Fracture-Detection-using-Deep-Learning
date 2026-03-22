@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.vscode/
+.idea/
+fractureai.db
+uploads/
+outputs/gradcam/
+reports/pdf/
+*.log
+.env
+.DS_Store

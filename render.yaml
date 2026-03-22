@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: fractureai
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    disk:
+      name: fractureai-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: FRACTUREAI_SECRET_KEY
+        generateValue: true
+      - key: FRACTUREAI_DATA_DIR
+        value: /data

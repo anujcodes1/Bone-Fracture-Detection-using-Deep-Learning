@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FractureAI | Overall Health Report</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="page-shell">
+    <div class="bg-orb orb-one"></div>
+    <div class="bg-orb orb-two"></div>
+    <div class="grid-overlay"></div>
+
+    <main class="container">
+      <header class="topbar topbar-app">
+        <div class="brand-mark">
+          <span class="brand-icon"></span>
+          <div>
+            <strong>FractureAI</strong>
+            <p>Overall Health Report</p>
+          </div>
+        </div>
+
+        <nav class="top-actions">
+          <a class="nav-chip" href="{{ url_for('index') }}">Back to Dashboard</a>
+          <a class="nav-chip" href="{{ url_for('report_file', filename=case_record.report_file) }}">Download PDF</a>
+          <div class="user-chip">{{ current_user.username }} / {{ current_user.role }}</div>
+        </nav>
+      </header>
+
+      <section class="glass-card">
+        <div class="section-head">
+          <p class="section-kicker">Patient Summary</p>
+          <h2>{{ case_record.patient_name or 'Unknown Patient' }}</h2>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-tile confidence-tile">
+            <span class="tile-label">Health Score</span>
+            <strong>{{ case_record.health_score|round(2) if case_record.health_score is not none else 'N/A' }}/100</strong>
+            <div class="confidence-meter">
+              <div class="confidence-fill" style="width: {{ case_record.health_score or 0 }}%;"></div>
+            </div>
+          </div>
+          <div class="summary-tile neutral-tile">
+            <span class="tile-label">Overall Health</span>
+            <strong>{{ case_record.overall_health or 'Not Calculated' }}</strong>
+          </div>
+          <div class="summary-tile {{ 'alert-tile' if case_record.result == 'Fracture' else 'safe-tile' }}">
+            <span class="tile-label">Fracture Result</span>
+            <strong>{{ case_record.result }}</strong>
+          </div>
+          <div class="summary-tile neutral-tile">
+            <span class="tile-label">AI Confidence</span>
+            <strong>{{ case_record.confidence|round(2) }}%</strong>
+          </div>
+        </div>
+
+        <div class="performance-grid">
+          <div class="glass-subcard">
+            <h3>Patient and Clinical Details</h3>
+            <ul class="performance-list">
+              <li>Patient ID: {{ case_record.patient_id or 'Not Provided' }}</li>
+              <li>Age: {{ case_record.patient_age or 'Not Provided' }}</li>
+              <li>Gender: {{ case_record.patient_gender or 'Not Provided' }}</li>
+              <li>Doctor: {{ case_record.doctor_name or 'Not Provided' }}</li>
+              <li>Symptoms: {{ case_record.symptoms or 'Not Provided' }}</li>
+              <li>Doctor Notes: {{ case_record.doctor_notes or 'Not Provided' }}</li>
+            </ul>
+          </div>
+
+          <div class="glass-subcard">
+            <h3>Vital Signs and Risk Inputs</h3>
+            <ul class="performance-list">
+              <li>Temperature: {{ case_record.temperature or 'Not Provided' }} C</li>
+              <li>Pulse Rate: {{ case_record.pulse_rate or 'Not Provided' }} bpm</li>
+              <li>SpO2: {{ case_record.spo2 or 'Not Provided' }}%</li>
+              <li>Blood Pressure: {{ case_record.systolic_bp or 'NA' }} / {{ case_record.diastolic_bp or 'NA' }}</li>
+              <li>Pain Level: {{ case_record.pain_level or 'Not Provided' }}</li>
+              <li>Region Label: {{ case_record.region_label or 'Not Available' }}</li>
+              <li>Severity: {{ case_record.severity or 'Not Available' }}</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="comparison-grid">
+          <div class="glass-subcard">
+            <h3>Uploaded X-ray</h3>
+            <img class="training-graph" src="{{ url_for('uploaded_file', filename=case_record.uploaded_image) }}" alt="Uploaded X-ray">
+          </div>
+
+          <div class="glass-subcard">
+            <h3>Grad-CAM Explanation</h3>
+            {% if case_record.gradcam_image %}
+            <img class="training-graph" src="{{ url_for('gradcam_file', filename=case_record.gradcam_image) }}" alt="Grad-CAM image">
+            {% else %}
+            <div class="placeholder-panel">Grad-CAM was not available for this case.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="glass-subcard">
+          <h3>Email Feature Status</h3>
+          {% if email_status.configured %}
+          <p class="message success">SMTP configuration is ready. Email report delivery can be used for this case.</p>
+          <form method="post" action="{{ url_for('send_email', case_id=case_record.id) }}" class="upload-form">
+            <label class="field">
+              <span>Recipient Email</span>
+              <input type="email" name="recipient_email" value="{{ case_record.patient_email or '' }}" placeholder="Enter any recipient email">
+            </label>
+            <button type="submit" class="secondary-btn">Send Health Report by Email</button>
+          </form>
+          {% else %}
+          <p class="message error">Email setup is incomplete. Missing variables: {{ email_status.missing|join(', ') }}</p>
+          <div class="code-block">
+            <pre><code>$env:FRACTUREAI_SMTP_SERVER="smtp.gmail.com"
+$env:FRACTUREAI_SMTP_PORT="587"
+$env:FRACTUREAI_SMTP_USERNAME="your_email@gmail.com"
+$env:FRACTUREAI_SMTP_PASSWORD="your_app_password"
+$env:FRACTUREAI_SENDER_EMAIL="your_email@gmail.com"</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
