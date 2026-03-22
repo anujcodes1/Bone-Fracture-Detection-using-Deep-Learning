@@ -78,6 +78,13 @@ def init_db():
             for row in connection.execute("PRAGMA table_info(cases)").fetchall()
         }
         column_definitions = {
+            "patient_name": "TEXT",
+            "patient_id": "TEXT",
+            "patient_age": "TEXT",
+            "patient_gender": "TEXT",
+            "doctor_name": "TEXT",
+            "patient_email": "TEXT",
+            "doctor_notes": "TEXT",
             "temperature": "TEXT",
             "pulse_rate": "TEXT",
             "spo2": "TEXT",
@@ -85,8 +92,14 @@ def init_db():
             "diastolic_bp": "TEXT",
             "pain_level": "TEXT",
             "symptoms": "TEXT",
+            "severity": "TEXT",
+            "region_label": "TEXT",
             "health_score": "REAL",
             "overall_health": "TEXT",
+            "uploaded_image": "TEXT",
+            "gradcam_image": "TEXT",
+            "report_file": "TEXT",
+            "feedback": "TEXT",
         }
         for column_name, column_type in column_definitions.items():
             if column_name not in existing_columns:
