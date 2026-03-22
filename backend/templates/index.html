@@ -114,6 +114,9 @@
       {% if message %}
       <p class="message success">{{ message }}</p>
       {% endif %}
+      {% for category, flash_message in get_flashed_messages(with_categories=true) %}
+      <p class="message {{ 'success' if category == 'success' else 'error' }}">{{ flash_message }}</p>
+      {% endfor %}
 
       <section class="glass-card setup-card">
         <div class="section-head">
@@ -404,18 +407,21 @@ $env:FRACTUREAI_SENDER_EMAIL="your_email@gmail.com"</code></pre>
               Speak Result
             </button>
             {% if report_file %}
-            <a class="secondary-btn pdf-btn" href="{{ url_for('report_file', filename=report_file) }}">Download Full PDF</a>
+            <a class="secondary-btn pdf-btn" href="{{ url_for('download_report', case_id=case_id) }}">Download Full PDF</a>
             {% endif %}
             {% if case_id %}
             <form method="post" action="{{ url_for('send_email', case_id=case_id) }}">
+              <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_id) }}">
               <input type="email" name="recipient_email" placeholder="Send report to any email" value="{{ recipient_email if recipient_email is defined else patient_details.patient_email }}">
               <button type="submit" class="secondary-btn">Email Report</button>
             </form>
             <form method="post" action="{{ url_for('feedback', case_id=case_id) }}">
+              <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_id) }}">
               <input type="hidden" name="feedback" value="correct">
               <button type="submit" class="secondary-btn">Mark Correct</button>
             </form>
             <form method="post" action="{{ url_for('feedback', case_id=case_id) }}">
+              <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_id) }}">
               <input type="hidden" name="feedback" value="incorrect">
               <button type="submit" class="secondary-btn">Mark Incorrect</button>
             </form>
@@ -486,7 +492,7 @@ $env:FRACTUREAI_SENDER_EMAIL="your_email@gmail.com"</code></pre>
                 <td><a href="{{ url_for('health_report', case_id=item.id) }}">Open</a></td>
                 <td>
                   {% if item.report_file %}
-                  <a href="{{ url_for('report_file', filename=item.report_file) }}">PDF</a>
+                  <a href="{{ url_for('download_report', case_id=item.id) }}">PDF</a>
                   {% else %}
                   -
                   {% endif %}

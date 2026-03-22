@@ -166,6 +166,15 @@ def update_feedback(case_id, feedback):
         connection.commit()
 
 
+def update_report_file(case_id, report_file):
+    with get_connection() as connection:
+        connection.execute(
+            "UPDATE cases SET report_file = ? WHERE id = ?",
+            (report_file, case_id),
+        )
+        connection.commit()
+
+
 def dashboard_stats():
     with get_connection() as connection:
         total_cases = connection.execute("SELECT COUNT(*) FROM cases").fetchone()[0]

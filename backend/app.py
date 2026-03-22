@@ -8,7 +8,7 @@ import sys
 from uuid import uuid4
 
 import numpy as np
-from flask import Flask, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, flash, redirect, render_template, request, send_file, send_from_directory, session, url_for
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
@@ -30,7 +30,7 @@ ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 sys.path.insert(0, str(MODEL_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from db import create_case, dashboard_stats, get_case, init_db, list_cases, recent_cases, update_feedback, verify_user  # noqa: E402
+from db import create_case, dashboard_stats, get_case, init_db, list_cases, recent_cases, update_feedback, update_report_file, verify_user  # noqa: E402
 
 
 app = Flask(
@@ -231,11 +231,11 @@ def create_pdf_report(case_data):
         ("Blood Pressure", f"{case_data['systolic_bp'] or 'NA'} / {case_data['diastolic_bp'] or 'NA'}"),
         ("Pain Level", case_data["pain_level"] or "Not Provided"),
         ("Result", case_data["result"]),
-        ("Confidence", f"{case_data['confidence']:.2f}%"),
-        ("Severity", case_data["severity"]),
-        ("Region Label", case_data["region_label"]),
-        ("Health Score", f"{case_data['health_score']:.2f}/100"),
-        ("Overall Health", case_data["overall_health"]),
+        ("Confidence", f"{float(case_data['confidence']):.2f}%"),
+        ("Severity", case_data.get("severity") or "Not Available"),
+        ("Region Label", case_data.get("region_label") or "Not Available"),
+        ("Health Score", format_health_score(case_data.get("health_score"))),
+        ("Overall Health", case_data.get("overall_health") or "Not Calculated"),
         ("Symptoms", case_data["symptoms"] or "Not Provided"),
         ("Doctor Notes", case_data["doctor_notes"] or "No notes added"),
     ]
@@ -281,6 +281,32 @@ def create_pdf_report(case_data):
     return report_name
 
 
+def resolve_next_url(default_endpoint="index", **values):
+    next_url = request.form.get("next_url", "").strip()
+    if next_url.startswith("/"):
+        return next_url
+    return url_for(default_endpoint, **values)
+
+
+def format_health_score(value):
+    if value is None:
+        return "N/A"
+    return f"{float(value):.2f}/100"
+
+
+def ensure_report_file(case_record):
+    report_name = (case_record.get("report_file") or "").strip()
+    report_path = PDF_DIR / report_name if report_name else None
+
+    if report_path and report_path.exists():
+        return report_path
+
+    regenerated_name = create_pdf_report(case_record)
+    update_report_file(case_record["id"], regenerated_name)
+    case_record["report_file"] = regenerated_name
+    return PDF_DIR / regenerated_name
+
+
 def send_report_email(case_record, recipient=None):
     recipient = (recipient or case_record.get("patient_email") or "").strip()
     if not recipient:
@@ -302,14 +328,14 @@ def send_report_email(case_record, recipient=None):
     message.set_content(
         f"Result: {case_record['result']}\n"
         f"Confidence: {case_record['confidence']:.2f}%\n"
-        f"Severity: {case_record['severity']}\n"
-        f"Health Score: {case_record['health_score']:.2f}/100\n"
-        f"Overall Health: {case_record['overall_health']}\n"
+        f"Severity: {case_record.get('severity') or 'Not Available'}\n"
+        f"Health Score: {format_health_score(case_record.get('health_score'))}\n"
+        f"Overall Health: {case_record.get('overall_health') or 'Not Calculated'}\n"
         f"Generated: {case_record['created_at']}"
     )
 
-    report_path = PDF_DIR / case_record["report_file"]
-    if report_path.exists():
+    try:
+        report_path = ensure_report_file(case_record)
         with report_path.open("rb") as report_obj:
             message.add_attachment(
                 report_obj.read(),
@@ -318,10 +344,12 @@ def send_report_email(case_record, recipient=None):
                 filename=report_path.name,
             )
 
-    with smtplib.SMTP(smtp_server, int(smtp_port)) as smtp:
-        smtp.starttls()
-        smtp.login(smtp_username, smtp_password)
-        smtp.send_message(message)
+        with smtplib.SMTP(smtp_server, int(smtp_port), timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(smtp_username, smtp_password)
+            smtp.send_message(message)
+    except Exception as exc:
+        return False, f"Unable to send email right now: {exc}"
 
     return True, f"Report emailed to {recipient}."
 
@@ -523,41 +551,49 @@ def index():
 @app.route("/feedback/<int:case_id>", methods=["POST"])
 @login_required
 def feedback(case_id):
+    case_record = get_case(case_id)
+    if case_record is None:
+        flash("Case not found.", "error")
+        return redirect(resolve_next_url())
+
     feedback_value = request.form.get("feedback", "").strip()
     if feedback_value in {"correct", "incorrect"}:
         update_feedback(case_id, feedback_value)
-    return redirect(url_for("index"))
+        flash(f"Feedback saved as {feedback_value}.", "success")
+    else:
+        flash("Please choose a valid feedback option.", "error")
+    return redirect(resolve_next_url("health_report", case_id=case_id))
+
+
+@app.route("/download-report/<int:case_id>")
+@login_required
+def download_report(case_id):
+    case_record = get_case(case_id)
+    if case_record is None:
+        flash("Case not found.", "error")
+        return redirect(url_for("index"))
+
+    try:
+        report_path = ensure_report_file(case_record)
+    except Exception as exc:
+        flash(f"Unable to prepare the PDF report: {exc}", "error")
+        return redirect(url_for("health_report", case_id=case_id))
+
+    return send_file(report_path, as_attachment=True, download_name=report_path.name)
 
 
 @app.route("/send-email/<int:case_id>", methods=["POST"])
 @login_required
 def send_email(case_id):
     case_record = get_case(case_id)
-    context = base_context()
-
     if case_record is None:
-        context["error"] = "Case not found."
-        return render_template("index.html", **context)
+        flash("Case not found.", "error")
+        return redirect(resolve_next_url())
 
     recipient_email = request.form.get("recipient_email", "").strip()
     success, message = send_report_email(case_record, recipient_email)
-    context["message"] = message
-    context["patient_details"] = patient_details_defaults(case_record)
-    context["result"] = case_record["result"]
-    context["confidence"] = round(case_record["confidence"], 2)
-    context["severity"] = case_record["severity"]
-    context["region_label"] = case_record["region_label"]
-    context["health_score"] = round(case_record["health_score"], 2)
-    context["overall_health"] = case_record["overall_health"]
-    context["health_flags"] = []
-    context["uploaded_image"] = case_record["uploaded_image"]
-    context["gradcam_image"] = case_record["gradcam_image"] or None
-    context["report_file"] = case_record["report_file"]
-    context["case_id"] = case_record["id"]
-    context["recipient_email"] = recipient_email or case_record.get("patient_email", "")
-    if not success:
-        context["error"] = message
-    return render_template("index.html", **context)
+    flash(message, "success" if success else "error")
+    return redirect(resolve_next_url("health_report", case_id=case_id))
 
 
 @app.route("/performance")

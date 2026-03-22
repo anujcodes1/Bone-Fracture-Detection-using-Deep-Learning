@@ -24,10 +24,14 @@
 
         <nav class="top-actions">
           <a class="nav-chip" href="{{ url_for('index') }}">Back to Dashboard</a>
-          <a class="nav-chip" href="{{ url_for('report_file', filename=case_record.report_file) }}">Download PDF</a>
+          <a class="nav-chip" href="{{ url_for('download_report', case_id=case_record.id) }}">Download PDF</a>
           <div class="user-chip">{{ current_user.username }} / {{ current_user.role }}</div>
         </nav>
       </header>
+
+      {% for category, flash_message in get_flashed_messages(with_categories=true) %}
+      <p class="message {{ 'success' if category == 'success' else 'error' }}">{{ flash_message }}</p>
+      {% endfor %}
 
       <section class="glass-card">
         <div class="section-head">
@@ -105,6 +109,7 @@
           {% if email_status.configured %}
           <p class="message success">SMTP configuration is ready. Email report delivery can be used for this case.</p>
           <form method="post" action="{{ url_for('send_email', case_id=case_record.id) }}" class="upload-form">
+            <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_record.id) }}">
             <label class="field">
               <span>Recipient Email</span>
               <input type="email" name="recipient_email" value="{{ case_record.patient_email or '' }}" placeholder="Enter any recipient email">
@@ -119,6 +124,19 @@ $env:FRACTUREAI_SMTP_PORT="587"
 $env:FRACTUREAI_SMTP_USERNAME="your_email@gmail.com"
 $env:FRACTUREAI_SMTP_PASSWORD="your_app_password"
 $env:FRACTUREAI_SENDER_EMAIL="your_email@gmail.com"</code></pre>
+          </div>
+          {% endif %}
+          <div class="action-row">
+            <form method="post" action="{{ url_for('feedback', case_id=case_record.id) }}">
+              <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_record.id) }}">
+              <input type="hidden" name="feedback" value="correct">
+              <button type="submit" class="secondary-btn">Mark Correct</button>
+            </form>
+            <form method="post" action="{{ url_for('feedback', case_id=case_record.id) }}">
+              <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_record.id) }}">
+              <input type="hidden" name="feedback" value="incorrect">
+              <button type="submit" class="secondary-btn">Mark Incorrect</button>
+            </form>
           </div>
         </div>
       </section>
