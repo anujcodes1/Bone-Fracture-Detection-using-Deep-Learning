@@ -31,9 +31,6 @@ sys.path.insert(0, str(MODEL_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from db import create_case, dashboard_stats, get_case, init_db, list_cases, recent_cases, update_feedback, verify_user  # noqa: E402
-from generate_gradcam import generate_gradcam  # noqa: E402
-from predict_single_image import predict_fracture  # noqa: E402
-from preprocess_data import create_data_generators  # noqa: E402
 
 
 app = Flask(
@@ -360,6 +357,7 @@ def compute_performance_metrics():
         return None
 
     from tensorflow.keras.models import load_model
+    from preprocess_data import create_data_generators
 
     _, _, test_generator = create_data_generators(DATASET_DIR)
     model = load_model(MODEL_PATH)
@@ -455,6 +453,8 @@ def index():
         uploaded_file.save(upload_path)
 
         try:
+            from predict_single_image import predict_fracture
+
             result, confidence = predict_fracture(upload_path)
             severity = estimate_severity(result, confidence)
             region_label = estimate_region_label(upload_path.name)
@@ -465,6 +465,8 @@ def index():
             )
 
             try:
+                from generate_gradcam import generate_gradcam
+
                 gradcam_path = generate_gradcam(upload_path)
                 gradcam_error = None
                 gradcam_name = gradcam_path.name
