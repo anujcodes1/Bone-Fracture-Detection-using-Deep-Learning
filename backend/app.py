@@ -1,11 +1,15 @@
 from pathlib import Path
+import base64
 from datetime import datetime
+import json
 from email.message import EmailMessage
 from functools import wraps
 import logging
 import os
 import smtplib
 import sys
+from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 from uuid import uuid4
 
 from flask import Flask, flash, redirect, render_template, request, send_file, send_from_directory, session, url_for
@@ -315,20 +319,19 @@ def send_report_email(case_record, recipient=None):
     if not recipient:
         return False, "Please enter an email address to send the report."
 
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    resend_from_email = os.getenv("RESEND_FROM_EMAIL", "").strip()
     smtp_server = os.getenv("FRACTUREAI_SMTP_SERVER")
     smtp_port = os.getenv("FRACTUREAI_SMTP_PORT", "587")
     smtp_username = os.getenv("FRACTUREAI_SMTP_USERNAME")
     smtp_password = os.getenv("FRACTUREAI_SMTP_PASSWORD")
     sender_email = os.getenv("FRACTUREAI_SENDER_EMAIL", smtp_username or "")
 
-    if not all([smtp_server, smtp_username, smtp_password, sender_email]):
-        return False, "Email server is not configured. Add FRACTUREAI_SMTP_* environment variables."
-
     message = EmailMessage()
     message["Subject"] = f"FractureAI Case Report for {case_record['patient_name'] or 'Patient'}"
-    message["From"] = sender_email
+    message["From"] = resend_from_email or sender_email
     message["To"] = recipient
-    message.set_content(
+    email_text = (
         f"Result: {case_record['result']}\n"
         f"Confidence: {case_record['confidence']:.2f}%\n"
         f"Severity: {case_record.get('severity') or 'Not Available'}\n"
@@ -336,21 +339,54 @@ def send_report_email(case_record, recipient=None):
         f"Overall Health: {case_record.get('overall_health') or 'Not Calculated'}\n"
         f"Generated: {case_record['created_at']}"
     )
+    message.set_content(email_text)
 
     try:
         report_path = ensure_report_file(case_record)
-        with report_path.open("rb") as report_obj:
+        report_bytes = report_path.read_bytes()
+
+        if resend_api_key and resend_from_email:
+            payload = {
+                "from": resend_from_email,
+                "to": [recipient],
+                "subject": message["Subject"],
+                "text": email_text,
+                "attachments": [
+                    {
+                        "filename": report_path.name,
+                        "content": base64.b64encode(report_bytes).decode("utf-8"),
+                    }
+                ],
+            }
+            resend_request = urllib_request.Request(
+                "https://api.resend.com/emails",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {resend_api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib_request.urlopen(resend_request, timeout=30) as response:
+                if response.status not in (200, 201):
+                    raise RuntimeError(f"Resend returned status {response.status}")
+        elif all([smtp_server, smtp_username, smtp_password, sender_email]):
             message.add_attachment(
-                report_obj.read(),
+                report_bytes,
                 maintype="application",
                 subtype="pdf",
                 filename=report_path.name,
             )
-
-        with smtplib.SMTP(smtp_server, int(smtp_port), timeout=30) as smtp:
-            smtp.starttls()
-            smtp.login(smtp_username, smtp_password)
-            smtp.send_message(message)
+            with smtplib.SMTP(smtp_server, int(smtp_port), timeout=30) as smtp:
+                smtp.starttls()
+                smtp.login(smtp_username, smtp_password)
+                smtp.send_message(message)
+        else:
+            return False, "Email provider is not configured. Add RESEND_API_KEY and RESEND_FROM_EMAIL for free Render."
+    except HTTPError as exc:
+        return False, f"Email provider error: {exc.read().decode('utf-8', errors='ignore')}"
+    except URLError as exc:
+        return False, f"Unable to reach the email provider: {exc.reason}"
     except Exception as exc:
         return False, f"Unable to send email right now: {exc}"
 
@@ -358,17 +394,27 @@ def send_report_email(case_record, recipient=None):
 
 
 def email_status():
-    required_keys = [
+    resend_required = ["RESEND_API_KEY", "RESEND_FROM_EMAIL"]
+    smtp_required = [
         "FRACTUREAI_SMTP_SERVER",
         "FRACTUREAI_SMTP_PORT",
         "FRACTUREAI_SMTP_USERNAME",
         "FRACTUREAI_SMTP_PASSWORD",
         "FRACTUREAI_SENDER_EMAIL",
     ]
-    missing = [key for key in required_keys if not os.getenv(key)]
+    resend_missing = [key for key in resend_required if not os.getenv(key)]
+    smtp_missing = [key for key in smtp_required if not os.getenv(key)]
+    provider = None
+    if not resend_missing:
+        provider = "resend"
+    elif not smtp_missing:
+        provider = "smtp"
     return {
-        "configured": len(missing) == 0,
-        "missing": missing,
+        "configured": provider is not None,
+        "provider": provider,
+        "missing": [] if provider else resend_required,
+        "resend_missing": resend_missing,
+        "smtp_missing": smtp_missing,
     }
 
 

@@ -1,82 +1,183 @@
-import sqlite3
 import os
+import sqlite3
 from pathlib import Path
 
 from werkzeug.security import check_password_hash, generate_password_hash
+
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:  # pragma: no cover
+    psycopg2 = None
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = Path(os.getenv("FRACTUREAI_DATA_DIR", str(BASE_DIR)))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "fractureai.db"
+SQLITE_DB_PATH = DATA_DIR / "fractureai.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+USE_POSTGRES = DATABASE_URL.startswith("postgres")
+
+
+def _normalized_database_url():
+    if DATABASE_URL.startswith("postgres://"):
+        return DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    return DATABASE_URL
 
 
 def get_connection():
-    connection = sqlite3.connect(DB_PATH)
+    if USE_POSTGRES:
+        if psycopg2 is None:
+            raise RuntimeError("psycopg2 is required when DATABASE_URL is set.")
+        connection = psycopg2.connect(_normalized_database_url())
+        connection.autocommit = False
+        return connection
+
+    connection = sqlite3.connect(SQLITE_DB_PATH)
     connection.row_factory = sqlite3.Row
     return connection
 
 
+def _fetchone_dict(cursor):
+    row = cursor.fetchone()
+    if row is None:
+        return None
+    if USE_POSTGRES:
+        columns = [description[0] for description in cursor.description]
+        return dict(zip(columns, row))
+    return dict(row)
+
+
+def _fetchall_dicts(cursor):
+    rows = cursor.fetchall()
+    if USE_POSTGRES:
+        columns = [description[0] for description in cursor.description]
+        return [dict(zip(columns, row)) for row in rows]
+    return [dict(row) for row in rows]
+
+
+def _placeholder():
+    return "%s" if USE_POSTGRES else "?"
+
+
 def init_db():
     with get_connection() as connection:
-        connection.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
-            );
+        cursor = connection.cursor()
 
-            CREATE TABLE IF NOT EXISTS cases (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                patient_name TEXT,
-                patient_id TEXT,
-                patient_age TEXT,
-                patient_gender TEXT,
-                doctor_name TEXT,
-                patient_email TEXT,
-                doctor_notes TEXT,
-                temperature TEXT,
-                pulse_rate TEXT,
-                spo2 TEXT,
-                systolic_bp TEXT,
-                diastolic_bp TEXT,
-                pain_level TEXT,
-                symptoms TEXT,
-                result TEXT NOT NULL,
-                confidence REAL NOT NULL,
-                severity TEXT,
-                region_label TEXT,
-                health_score REAL,
-                overall_health TEXT,
-                uploaded_image TEXT,
-                gradcam_image TEXT,
-                report_file TEXT,
-                feedback TEXT,
-                created_at TEXT NOT NULL
-            );
-            """
-        )
+        if USE_POSTGRES:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS cases (
+                    id SERIAL PRIMARY KEY,
+                    patient_name TEXT,
+                    patient_id TEXT,
+                    patient_age TEXT,
+                    patient_gender TEXT,
+                    doctor_name TEXT,
+                    patient_email TEXT,
+                    doctor_notes TEXT,
+                    temperature TEXT,
+                    pulse_rate TEXT,
+                    spo2 TEXT,
+                    systolic_bp TEXT,
+                    diastolic_bp TEXT,
+                    pain_level TEXT,
+                    symptoms TEXT,
+                    result TEXT NOT NULL,
+                    confidence DOUBLE PRECISION NOT NULL,
+                    severity TEXT,
+                    region_label TEXT,
+                    health_score DOUBLE PRECISION,
+                    overall_health TEXT,
+                    uploaded_image TEXT,
+                    gradcam_image TEXT,
+                    report_file TEXT,
+                    feedback TEXT,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+        else:
+            cursor.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    role TEXT NOT NULL
+                );
 
+                CREATE TABLE IF NOT EXISTS cases (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    patient_name TEXT,
+                    patient_id TEXT,
+                    patient_age TEXT,
+                    patient_gender TEXT,
+                    doctor_name TEXT,
+                    patient_email TEXT,
+                    doctor_notes TEXT,
+                    temperature TEXT,
+                    pulse_rate TEXT,
+                    spo2 TEXT,
+                    systolic_bp TEXT,
+                    diastolic_bp TEXT,
+                    pain_level TEXT,
+                    symptoms TEXT,
+                    result TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    severity TEXT,
+                    region_label TEXT,
+                    health_score REAL,
+                    overall_health TEXT,
+                    uploaded_image TEXT,
+                    gradcam_image TEXT,
+                    report_file TEXT,
+                    feedback TEXT,
+                    created_at TEXT NOT NULL
+                );
+                """
+            )
+
+        placeholder = _placeholder()
         for username, password, role in (
             ("admin", "admin123", "admin"),
             ("doctor", "doctor123", "doctor"),
         ):
-            existing = connection.execute(
-                "SELECT id FROM users WHERE username = ?",
+            cursor.execute(
+                f"SELECT id FROM users WHERE username = {placeholder}",
                 (username,),
-            ).fetchone()
+            )
+            existing = cursor.fetchone()
             if existing is None:
-                connection.execute(
-                    "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                cursor.execute(
+                    f"INSERT INTO users (username, password_hash, role) VALUES ({placeholder}, {placeholder}, {placeholder})",
                     (username, generate_password_hash(password), role),
                 )
 
-        existing_columns = {
-            row["name"]
-            for row in connection.execute("PRAGMA table_info(cases)").fetchall()
-        }
+        if USE_POSTGRES:
+            cursor.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'cases'
+                """
+            )
+            existing_columns = {row[0] for row in cursor.fetchall()}
+        else:
+            existing_columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(cases)").fetchall()
+            }
+
         column_definitions = {
             "patient_name": "TEXT",
             "patient_id": "TEXT",
@@ -94,16 +195,17 @@ def init_db():
             "symptoms": "TEXT",
             "severity": "TEXT",
             "region_label": "TEXT",
-            "health_score": "REAL",
+            "health_score": "DOUBLE PRECISION" if USE_POSTGRES else "REAL",
             "overall_health": "TEXT",
             "uploaded_image": "TEXT",
             "gradcam_image": "TEXT",
             "report_file": "TEXT",
             "feedback": "TEXT",
         }
+
         for column_name, column_type in column_definitions.items():
             if column_name not in existing_columns:
-                connection.execute(
+                cursor.execute(
                     f"ALTER TABLE cases ADD COLUMN {column_name} {column_type}"
                 )
 
@@ -112,28 +214,39 @@ def init_db():
 
 def verify_user(username, password):
     with get_connection() as connection:
-        user = connection.execute(
-            "SELECT * FROM users WHERE username = ?",
+        cursor = connection.cursor()
+        cursor.execute(
+            f"SELECT * FROM users WHERE username = {_placeholder()}",
             (username,),
-        ).fetchone()
+        )
+        user = _fetchone_dict(cursor)
 
     if user and check_password_hash(user["password_hash"], password):
-        return dict(user)
+        return user
     return None
 
 
 def create_case(case_data):
-    columns = ", ".join(case_data.keys())
-    placeholders = ", ".join(["?"] * len(case_data))
-    values = tuple(case_data.values())
+    columns = list(case_data.keys())
+    placeholders = ", ".join([_placeholder()] * len(columns))
+    values = tuple(case_data[column] for column in columns)
 
     with get_connection() as connection:
-        cursor = connection.execute(
-            f"INSERT INTO cases ({columns}) VALUES ({placeholders})",
-            values,
-        )
+        cursor = connection.cursor()
+        if USE_POSTGRES:
+            cursor.execute(
+                f"INSERT INTO cases ({', '.join(columns)}) VALUES ({placeholders}) RETURNING id",
+                values,
+            )
+            case_id = cursor.fetchone()[0]
+        else:
+            cursor.execute(
+                f"INSERT INTO cases ({', '.join(columns)}) VALUES ({placeholders})",
+                values,
+            )
+            case_id = cursor.lastrowid
         connection.commit()
-        return cursor.lastrowid
+        return case_id
 
 
 def list_cases(search_query=""):
@@ -141,39 +254,44 @@ def list_cases(search_query=""):
     params = []
 
     if search_query:
-        sql += " WHERE patient_name LIKE ? OR patient_id LIKE ?"
         wildcard = f"%{search_query}%"
+        placeholder = _placeholder()
+        sql += f" WHERE patient_name LIKE {placeholder} OR patient_id LIKE {placeholder}"
         params.extend([wildcard, wildcard])
 
-    sql += " ORDER BY datetime(created_at) DESC"
+    sql += " ORDER BY id DESC"
 
     with get_connection() as connection:
-        rows = connection.execute(sql, params).fetchall()
-    return [dict(row) for row in rows]
+        cursor = connection.cursor()
+        cursor.execute(sql, params)
+        return _fetchall_dicts(cursor)
 
 
 def recent_cases(limit=5):
     with get_connection() as connection:
-        rows = connection.execute(
-            "SELECT * FROM cases ORDER BY datetime(created_at) DESC LIMIT ?",
+        cursor = connection.cursor()
+        cursor.execute(
+            f"SELECT * FROM cases ORDER BY id DESC LIMIT {_placeholder()}",
             (limit,),
-        ).fetchall()
-    return [dict(row) for row in rows]
+        )
+        return _fetchall_dicts(cursor)
 
 
 def get_case(case_id):
     with get_connection() as connection:
-        row = connection.execute(
-            "SELECT * FROM cases WHERE id = ?",
+        cursor = connection.cursor()
+        cursor.execute(
+            f"SELECT * FROM cases WHERE id = {_placeholder()}",
             (case_id,),
-        ).fetchone()
-    return dict(row) if row else None
+        )
+        return _fetchone_dict(cursor)
 
 
 def update_feedback(case_id, feedback):
     with get_connection() as connection:
-        connection.execute(
-            "UPDATE cases SET feedback = ? WHERE id = ?",
+        cursor = connection.cursor()
+        cursor.execute(
+            f"UPDATE cases SET feedback = {_placeholder()} WHERE id = {_placeholder()}",
             (feedback, case_id),
         )
         connection.commit()
@@ -181,8 +299,9 @@ def update_feedback(case_id, feedback):
 
 def update_report_file(case_id, report_file):
     with get_connection() as connection:
-        connection.execute(
-            "UPDATE cases SET report_file = ? WHERE id = ?",
+        cursor = connection.cursor()
+        cursor.execute(
+            f"UPDATE cases SET report_file = {_placeholder()} WHERE id = {_placeholder()}",
             (report_file, case_id),
         )
         connection.commit()
@@ -190,13 +309,13 @@ def update_report_file(case_id, report_file):
 
 def dashboard_stats():
     with get_connection() as connection:
-        total_cases = connection.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
-        fracture_cases = connection.execute(
-            "SELECT COUNT(*) FROM cases WHERE result = 'Fracture'"
-        ).fetchone()[0]
-        average_confidence = connection.execute(
-            "SELECT AVG(confidence) FROM cases"
-        ).fetchone()[0]
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT(*) FROM cases")
+        total_cases = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM cases WHERE result = 'Fracture'")
+        fracture_cases = cursor.fetchone()[0]
+        cursor.execute("SELECT AVG(confidence) FROM cases")
+        average_confidence = cursor.fetchone()[0]
 
     safe_total = total_cases or 1
     return {
@@ -204,5 +323,5 @@ def dashboard_stats():
         "fracture_cases": fracture_cases,
         "normal_cases": total_cases - fracture_cases,
         "fracture_rate": round((fracture_cases / safe_total) * 100, 2) if total_cases else 0,
-        "average_confidence": round(average_confidence or 0, 2),
+        "average_confidence": round(float(average_confidence or 0), 2),
     }

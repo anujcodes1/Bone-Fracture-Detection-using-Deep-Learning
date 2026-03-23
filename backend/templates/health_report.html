@@ -107,7 +107,7 @@
         <div class="glass-subcard">
           <h3>Email Feature Status</h3>
           {% if email_status.configured %}
-          <p class="message success">SMTP configuration is ready. Email report delivery can be used for this case.</p>
+          <p class="message success">Email delivery is configured using {{ email_status.provider|upper }}. This case report can be sent now.</p>
           <form method="post" action="{{ url_for('send_email', case_id=case_record.id) }}" class="upload-form">
             <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_record.id) }}">
             <label class="field">
@@ -117,13 +117,10 @@
             <button type="submit" class="secondary-btn">Send Health Report by Email</button>
           </form>
           {% else %}
-          <p class="message error">Email setup is incomplete. Missing variables: {{ email_status.missing|join(', ') }}</p>
+          <p class="message error">Email setup is incomplete for free Render. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
           <div class="code-block">
-            <pre><code>$env:FRACTUREAI_SMTP_SERVER="smtp.gmail.com"
-$env:FRACTUREAI_SMTP_PORT="587"
-$env:FRACTUREAI_SMTP_USERNAME="your_email@gmail.com"
-$env:FRACTUREAI_SMTP_PASSWORD="your_app_password"
-$env:FRACTUREAI_SENDER_EMAIL="your_email@gmail.com"</code></pre>
+            <pre><code>RESEND_API_KEY=re_xxxxxxxxx
+RESEND_FROM_EMAIL=onboarding@resend.dev</code></pre>
           </div>
           {% endif %}
           <div class="action-row">
