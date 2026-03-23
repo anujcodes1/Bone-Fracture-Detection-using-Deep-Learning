@@ -8,13 +8,8 @@ import smtplib
 import sys
 from uuid import uuid4
 
-import numpy as np
 from flask import Flask, flash, redirect, render_template, request, send_file, send_from_directory, session, url_for
 from werkzeug.exceptions import HTTPException
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
 
 
@@ -200,6 +195,11 @@ def compute_health_assessment(patient_details, result, confidence):
 
 
 def create_pdf_report(case_data):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
     report_name = f"fracture_report_{uuid4().hex}.pdf"
     report_path = PDF_DIR / report_name
 
@@ -417,6 +417,7 @@ def compute_performance_metrics():
     if not MODEL_PATH.exists():
         return None
 
+    import numpy as np
     from tensorflow.keras.models import load_model
     from preprocess_data import create_data_generators
 
