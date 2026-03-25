@@ -125,14 +125,13 @@
         </div>
 
         {% if email_status.configured %}
-        <p class="message success">Email delivery is configured using {{ email_status.provider|upper }}. You can send PDF case reports directly from the dashboard.</p>
+        <p class="message success">Email delivery is configured using {{ email_status.provider|upper }}. Current sender: {{ email_status.from_email }}.</p>
         {% else %}
-        <p class="message error">Email is not configured yet. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
+        <p class="message error">Email is not configured yet. Missing variables: {{ email_status.missing|join(', ') }}</p>
         <div class="code-block">
-          <pre><code>RESEND_API_KEY=re_xxxxxxxxx
-RESEND_FROM_EMAIL=onboarding@resend.dev</code></pre>
+          <pre><code>RESEND_API_KEY=re_xxxxxxxxx</code></pre>
         </div>
-        <p class="helper-text">Use Resend API over HTTPS for reliable email delivery across hosting platforms.</p>
+        <p class="helper-text">`RESEND_FROM_EMAIL` is optional for testing and defaults to onboarding@resend.dev.</p>
         {% endif %}
       </section>
 

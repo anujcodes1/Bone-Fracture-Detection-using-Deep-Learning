@@ -320,7 +320,7 @@ def send_report_email(case_record, recipient=None):
         return False, "Please enter an email address to send the report."
 
     resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
-    resend_from_email = os.getenv("RESEND_FROM_EMAIL", "").strip()
+    resend_from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
     smtp_server = os.getenv("FRACTUREAI_SMTP_SERVER")
     smtp_port = os.getenv("FRACTUREAI_SMTP_PORT", "587")
     smtp_username = os.getenv("FRACTUREAI_SMTP_USERNAME")
@@ -382,7 +382,7 @@ def send_report_email(case_record, recipient=None):
                 smtp.login(smtp_username, smtp_password)
                 smtp.send_message(message)
         else:
-            return False, "Email provider is not configured. Add RESEND_API_KEY and RESEND_FROM_EMAIL."
+            return False, "Email provider is not configured. Add RESEND_API_KEY."
     except HTTPError as exc:
         return False, f"Email provider error: {exc.read().decode('utf-8', errors='ignore')}"
     except URLError as exc:
@@ -394,7 +394,7 @@ def send_report_email(case_record, recipient=None):
 
 
 def email_status():
-    resend_required = ["RESEND_API_KEY", "RESEND_FROM_EMAIL"]
+    resend_required = ["RESEND_API_KEY"]
     smtp_required = [
         "FRACTUREAI_SMTP_SERVER",
         "FRACTUREAI_SMTP_PORT",
@@ -404,6 +404,7 @@ def email_status():
     ]
     resend_missing = [key for key in resend_required if not os.getenv(key)]
     smtp_missing = [key for key in smtp_required if not os.getenv(key)]
+    resend_from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
     provider = None
     if not resend_missing:
         provider = "resend"
@@ -415,6 +416,7 @@ def email_status():
         "missing": [] if provider else resend_required,
         "resend_missing": resend_missing,
         "smtp_missing": smtp_missing,
+        "from_email": resend_from_email,
     }
 
 

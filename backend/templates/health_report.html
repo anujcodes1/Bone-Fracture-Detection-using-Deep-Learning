@@ -107,7 +107,7 @@
         <div class="glass-subcard">
           <h3>Email Feature Status</h3>
           {% if email_status.configured %}
-          <p class="message success">Email delivery is configured using {{ email_status.provider|upper }}. This case report can be sent now.</p>
+          <p class="message success">Email delivery is configured using {{ email_status.provider|upper }}. Current sender: {{ email_status.from_email }}.</p>
           <form method="post" action="{{ url_for('send_email', case_id=case_record.id) }}" class="upload-form">
             <input type="hidden" name="next_url" value="{{ url_for('health_report', case_id=case_record.id) }}">
             <label class="field">
@@ -117,11 +117,11 @@
             <button type="submit" class="secondary-btn">Send Health Report by Email</button>
           </form>
           {% else %}
-          <p class="message error">Email setup is incomplete. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
+          <p class="message error">Email setup is incomplete. Missing variables: {{ email_status.missing|join(', ') }}</p>
           <div class="code-block">
-            <pre><code>RESEND_API_KEY=re_xxxxxxxxx
-RESEND_FROM_EMAIL=onboarding@resend.dev</code></pre>
+            <pre><code>RESEND_API_KEY=re_xxxxxxxxx</code></pre>
           </div>
+          <p class="helper-text">`RESEND_FROM_EMAIL` is optional for testing and defaults to onboarding@resend.dev.</p>
           {% endif %}
           <div class="action-row">
             <form method="post" action="{{ url_for('feedback', case_id=case_record.id) }}">
