@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "fluid": true,
   "functions": {
-    "app.py": {
+    "api/index.py": {
       "includeFiles": "{backend/**,static/**,model/**}",
       "excludeFiles": "{dataset/**,uploads/**,outputs/**,reports/**,venv/**,__pycache__/**,*.db,*.sqlite,*.sqlite3}"
     }
@@ -10,7 +10,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/app.py"
+      "destination": "/api/index.py"
     }
   ]
 }
