@@ -382,7 +382,7 @@ def send_report_email(case_record, recipient=None):
                 smtp.login(smtp_username, smtp_password)
                 smtp.send_message(message)
         else:
-            return False, "Email provider is not configured. Add RESEND_API_KEY and RESEND_FROM_EMAIL for free Render."
+            return False, "Email provider is not configured. Add RESEND_API_KEY and RESEND_FROM_EMAIL."
     except HTTPError as exc:
         return False, f"Email provider error: {exc.read().decode('utf-8', errors='ignore')}"
     except URLError as exc:

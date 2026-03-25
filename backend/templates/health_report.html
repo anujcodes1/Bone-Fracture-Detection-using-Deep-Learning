@@ -117,7 +117,7 @@
             <button type="submit" class="secondary-btn">Send Health Report by Email</button>
           </form>
           {% else %}
-          <p class="message error">Email setup is incomplete for free Render. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
+          <p class="message error">Email setup is incomplete. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
           <div class="code-block">
             <pre><code>RESEND_API_KEY=re_xxxxxxxxx
 RESEND_FROM_EMAIL=onboarding@resend.dev</code></pre>

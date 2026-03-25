@@ -127,12 +127,12 @@
         {% if email_status.configured %}
         <p class="message success">Email delivery is configured using {{ email_status.provider|upper }}. You can send PDF case reports directly from the dashboard.</p>
         {% else %}
-        <p class="message error">Email is not configured yet for free Render. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
+        <p class="message error">Email is not configured yet. Recommended missing variables: {{ email_status.missing|join(', ') }}</p>
         <div class="code-block">
           <pre><code>RESEND_API_KEY=re_xxxxxxxxx
 RESEND_FROM_EMAIL=onboarding@resend.dev</code></pre>
         </div>
-        <p class="helper-text">Free Render blocks SMTP ports, so use Resend API over HTTPS for email delivery.</p>
+        <p class="helper-text">Use Resend API over HTTPS for reliable email delivery across hosting platforms.</p>
         {% endif %}
       </section>
 
