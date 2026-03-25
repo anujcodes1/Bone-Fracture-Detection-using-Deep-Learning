@@ -1,0 +1,12 @@
+dataset/
+uploads/
+outputs/
+reports/
+venv/
+__pycache__/
+*.db
+*.sqlite
+*.sqlite3
+render.yaml
+Dockerfile
+.dockerignore
